@@ -3,7 +3,7 @@ const bodyParser = require('body-parser');
 const { Pool } = require('pg');
 const redis = require('redis');
 var elasticsearch = require('elasticsearch');
-const envProps = require('./local_env_props');
+const envProps = require('./env_props');
 
 // Initializing the Express Framework /////////////////////////////////////////////////////
 const app = express();
@@ -42,12 +42,12 @@ redisClient.on('error', (err) => console.log('Something went wrong with Redis: '
 
 // Elasticsearch Client Setup ///////////////////////////////////////////////
 const elasticClient = new elasticsearch.Client({
-    hosts: [ envProps.elasticHost + ':' + envProps.elasticPort]
+    hosts: [envProps.elasticHost + ':' + envProps.elasticPort]
 });
 // Ping the client to be sure Elastic is up
 elasticClient.ping({
     requestTimeout: 30000,
-}, function(error) {
+}, function (error) {
     if (error) {
         console.error('Something went wrong with Elasticsearch: ' + error);
     } else {
@@ -59,7 +59,7 @@ const TODO_SEARCH_INDEX_NAME = "todos";
 const TODO_SEARCH_INDEX_TYPE = "todo";
 elasticClient.indices.create({
     index: TODO_SEARCH_INDEX_NAME
-}, function(error, response, status) {
+}, function (error, response, status) {
     if (error) {
         console.log(error);
     } else {
@@ -70,7 +70,7 @@ elasticClient.indices.create({
 // Set up the API routes /////////////////////////////////////////////////////
 
 // Get all todos
-app.route('/api/v1/todos').get( async (req, res) => {
+app.route('/api/v1/todos').get(async (req, res) => {
     console.log('CALLED GET api/v1/todos');
 
     res.setHeader('Content-Type', 'application/json');
@@ -85,7 +85,7 @@ app.route('/api/v1/todos').get( async (req, res) => {
         if (cachedTodoSet == null) {
             // Nothing in cache, get from database
             await postgresClient.query('SELECT title FROM todo', (error, todoRows) => {
-                if(error) {
+                if (error) {
                     throw error;
                 }
                 todos = todoRows.rows; // [{"title":"Get kids from school"},{"title":"Take out the trash"},{"title":"Go shopping"}]
@@ -93,8 +93,8 @@ app.route('/api/v1/todos').get( async (req, res) => {
                 res.send(todos);
             });
         } else {
-            for(var i = 0; i < cachedTodoSet.length; i++) {
-                todos.push({"title": cachedTodoSet[i]});
+            for (var i = 0; i < cachedTodoSet.length; i++) {
+                todos.push({ "title": cachedTodoSet[i] });
             }
             console.log('  Got todos from Redis cache: ' + todos);
             res.send(todos);
@@ -103,7 +103,7 @@ app.route('/api/v1/todos').get( async (req, res) => {
 });
 
 // Create a new todo
-app.route('/api/v1/todos').post( async (req, res) => {
+app.route('/api/v1/todos').post(async (req, res) => {
     const todoTitle = req.body.title;
 
     console.log('CALLED POST api/v1/todos with title=' + todoTitle);
@@ -129,7 +129,7 @@ app.route('/api/v1/todos').post( async (req, res) => {
         index: TODO_SEARCH_INDEX_NAME,
         type: TODO_SEARCH_INDEX_TYPE,
         body: { todotext: todoTitle }
-    }, function(err, resp, status) {
+    }, function (err, resp, status) {
         if (err) {
             console.log('Could not index ' + todoTitle + ": " + err);
         }
@@ -147,21 +147,21 @@ app.route('/api/v1/search').post(async (req, res) => {
 
     // Perform the actual search passing in the index, the search query and the type
     await elasticClient.search({
-            index: TODO_SEARCH_INDEX_NAME,
-            type: TODO_SEARCH_INDEX_TYPE,
-            body: {
-                query: {
-                    match: {
-                        todotext: searchText
-                    }
+        index: TODO_SEARCH_INDEX_NAME,
+        type: TODO_SEARCH_INDEX_TYPE,
+        body: {
+            query: {
+                match: {
+                    todotext: searchText
                 }
             }
-        })
+        }
+    })
         .then(results => {
             console.log('Search for "' + searchText + '" matched: ' + results.hits.hits);
             res.send(results.hits.hits);
         })
-        .catch(err=>{
+        .catch(err => {
             console.log(err);
             res.send([]);
         });
